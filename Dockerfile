@@ -34,8 +34,14 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install dumb-init for proper PID 1 signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper PID 1 signal handling, plus postgresql-client
+# for pg_dump — the scheduled DB-backup job (see bootstrap/backup scripts)
+# shells out to pg_dump directly and was failing with "spawn pg_dump ENOENT"
+# on every run, since Alpine's base image has neither installed by default.
+# A failed pg_dump wrote its full connection string (including the Postgres
+# password) to the application log on every attempt, so this doubles as a
+# real credential-exposure fix, not just restoring a broken backup job.
+RUN apk add --no-cache dumb-init postgresql-client
 
 # Copy root config files for workspace resolution
 COPY package.json package-lock.json ./
