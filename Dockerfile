@@ -4,15 +4,21 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy root config files
-COPY package.json package-lock.json tsconfig.base.json ./
+COPY package.json tsconfig.base.json ./
 
 # Copy workspace package.json files for dependency resolution
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/client/package.json packages/client/
 
-# Install all dependencies (including dev for building)
-RUN npm ci
+# Install all dependencies using npm install so that the root "overrides"
+# field is respected. npm ci requires the lock file to already reflect any
+# overrides; since we are pinning react to 18.x to fix the @react-pdf/renderer
+# dual-instance issue and the lock file predates that pin, npm install is the
+# correct command here — it resolves fresh against the overrides and produces
+# a consistent install. --legacy-peer-deps is added because some transitive
+# packages declare react 19 as a peer and would otherwise block the install.
+RUN npm install --legacy-peer-deps
 
 # Copy source code (cache-bust: changes to any source invalidates build)
 COPY packages/shared packages/shared
@@ -38,14 +44,15 @@ WORKDIR /app
 RUN apk add --no-cache dumb-init
 
 # Copy root config files for workspace resolution
-COPY package.json package-lock.json ./
+COPY package.json ./
 
 # Copy workspace package.json files
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 
-# Install production dependencies only
-RUN npm ci --omit=dev
+# Install production dependencies only — same reasoning as build stage:
+# npm install respects the root overrides (react 18 pin), npm ci would not.
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Copy built artifacts from builder stage
 COPY --from=builder /app/packages/shared/dist packages/shared/dist
