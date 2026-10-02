@@ -1,0 +1,4 @@
+# PORTAINER_WEBHOOK_ATLAS = https://portainer.nasmatrix.app/api/stacks/webhooks/5bbc0932-28a2-4e08-8dc0-27359f8f0c05
+# Add the above as a GitHub Actions repository secret named PORTAINER_WEBHOOK_ATLAS
+# This allows the docker-fork.yml CI to trigger an Atlas redeploy after each image push.
+# Added 2026-10-02 by the homelab automation session.
