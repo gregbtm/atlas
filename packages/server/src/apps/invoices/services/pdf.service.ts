@@ -107,7 +107,27 @@ export async function generateInvoicePdf(tenantId: string, invoiceId: string): P
   const templateId = settings?.templateId || 'classic';
   const Template = getTemplate(templateId);
 
-  // @react-pdf/renderer types expect DocumentProps but templates return Document elements
-  const pdfBuffer = await renderToBuffer(React.createElement(Template, templateProps) as any);
+  // Wrap renderToBuffer with explicit error capture so that non-Error rejections
+  // (plain objects, undefined, etc.) are surfaced with full detail rather than
+  // being silently swallowed as {} by the upstream pino serialiser.
+  let pdfBuffer: Uint8Array;
+  try {
+    // @react-pdf/renderer types expect DocumentProps but templates return Document elements
+    pdfBuffer = await renderToBuffer(React.createElement(Template, templateProps) as any);
+  } catch (renderErr) {
+    const isError = renderErr instanceof Error;
+    logger.error({
+      renderErrType: typeof renderErr,
+      renderErrIsError: isError,
+      renderErrMessage: isError ? renderErr.message : String(renderErr),
+      renderErrStack: isError ? renderErr.stack : undefined,
+      renderErrRaw: (() => { try { return JSON.stringify(renderErr); } catch { return '[unserializable]'; } })(),
+      reactVersion: React.version,
+      templateId,
+      invoiceId,
+    }, 'renderToBuffer failed — full diagnostic');
+    throw renderErr;
+  }
+
   return Buffer.from(pdfBuffer);
 }
